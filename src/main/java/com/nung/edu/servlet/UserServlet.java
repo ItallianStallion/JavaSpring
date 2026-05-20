@@ -29,47 +29,48 @@ public class UserServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         setCorsHeaders(response);
 
-        String requestParam = request.getParameter("param");
+        String jsonArray = DatabaseManager.getAllMoviesAsJson();
 
-        String pathInfo = request.getPathInfo();
-        String pathVar = "Не вказано";
-        if (pathInfo != null && pathInfo.length() > 1) {
-            pathVar = pathInfo.substring(1);
-        }
-
-        HttpSession session = request.getSession(false);
-        String sessionUser = (session != null) ? (String) session.getAttribute("username") : "Гість";
-
-        response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/json");
 
         PrintWriter out = response.getWriter();
-        String jsonResponse = String.format(
-                "{\"requestParam\": \"%s\", \"pathVariable\": \"%s\", \"sessionUser\": \"%s\"}",
-                requestParam != null ? requestParam : "null", pathVar, sessionUser
-        );
-
-        out.print(jsonResponse);
+        out.print(jsonArray);
         out.flush();
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        request.setCharacterEncoding("UTF-8");
         setCorsHeaders(response);
 
-        HttpSession session = request.getSession();
-        session.setAttribute("username", "JohnDoe");
-
-        Cookie userCookie = new Cookie("Orange", "orange");
-        userCookie.setMaxAge(60 * 60);
-        userCookie.setPath("/");
-        response.addCookie(userCookie);
+        // Витягуємо дані, які надіслав React
+        String title = request.getParameter("title");
+        String director = request.getParameter("director");
+        String genre = request.getParameter("genre");
+        String ratingStr = request.getParameter("rating");
 
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json");
+        java.io.PrintWriter out = response.getWriter();
 
-        PrintWriter out = response.getWriter();
-        out.print("{\"status\": \"Success\", \"message\": \"Сесію успішно створено, кукі додано!\"}");
+        // Перевіряємо, чи всі поля заповнені
+        if (title != null && director != null && genre != null && ratingStr != null) {
+            try {
+                double rating = Double.parseDouble(ratingStr);
+                boolean success = DatabaseManager.addMovie(title, director, genre, rating);
+
+                if (success) {
+                    out.print("{\"status\":\"success\", \"message\":\"Фільм успішно додано!\"}");
+                } else {
+                    out.print("{\"status\":\"error\", \"message\":\"Помилка збереження в базу\"}");
+                }
+            } catch (NumberFormatException e) {
+                out.print("{\"status\":\"error\", \"message\":\"Рейтинг має бути числом!\"}");
+            }
+        } else {
+            out.print("{\"status\":\"error\", \"message\":\"Заповніть всі поля!\"}");
+        }
         out.flush();
     }
 }

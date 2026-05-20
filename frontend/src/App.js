@@ -1,87 +1,123 @@
-import React, { useState } from 'react';
-import { Container, Button, Card, Row, Col, Alert } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Container, Button, Card, Row, Col, Badge, Form } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 function App() {
-  const [backendData, setBackendData] = useState(null);
-  const [message, setMessage] = useState('');
+    const [movies, setMovies] = useState([]);
 
-  // 1. Відправка POST-запиту для створення сесії та кукі
-  const handleStartSession = () => {
-    // credentials: 'include' дозволяє браузеру зберегти кукі, які прийдуть від Tomcat (порт 8080)
-    fetch('http://localhost:8080/JavaSpring/user', {
-      method: 'POST',
-      credentials: 'include'
-    })
-        .then(res => res.json())
-        .then(data => {
-          setMessage(data.message);
-          setBackendData(null);
+    const [formData, setFormData] = useState({ title: '', director: '', genre: '', rating: '' });
+
+    const handleFetchData = () => {
+        fetch('http://localhost:8080/JavaSpring/user', {
+            method: 'GET',
+            credentials: 'include'
         })
-        .catch(err => console.error("Помилка POST:", err));
-  };
+            .then(res => res.json())
+            .then(data => setMovies(data))
+            .catch(err => console.error("Помилка GET:", err));
+    };
 
-  // 2. Відправка GET-запиту (передаємо @RequestParam та @PathVariable)
-  const handleFetchData = () => {
+    const handleInputChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
 
-    fetch('http://localhost:8080/JavaSpring/user/ID_Mykola_WSL?param=ReactApp&format=json', {
-      method: 'GET',
-      credentials: 'include'
-    })
-        .then(res => res.json())
-        .then(data => setBackendData(data))
-        .catch(err => console.error("Помилка GET:", err));
-  };
+    const handleAddMovie = (e) => {
+        e.preventDefault();
 
-  return (
-      <Container className="mt-5">
-        <h1 className="text-center mb-4">Лабораторна робота №1</h1>
+        const params = new URLSearchParams();
+        params.append('title', formData.title);
+        params.append('director', formData.director);
+        params.append('genre', formData.genre);
+        params.append('rating', formData.rating);
 
-        <Row className="justify-content-center mb-4">
-          <Col md={8} className="d-flex justify-content-around">
-            <Button variant="primary" size="lg" onClick={handleStartSession}>
-              1. Ініціалізувати сесію (POST)
-            </Button>
-            <Button variant="success" size="lg" onClick={handleFetchData}>
-              2. Отримати дані з сервера (GET)
-            </Button>
-          </Col>
-        </Row>
+        fetch('http://localhost:8080/JavaSpring/user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            credentials: 'include',
+            body: params.toString()
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    handleFetchData(); // Миттєво оновлюємо список!
+                    setFormData({ title: '', director: '', genre: '', rating: '' }); // Очищаємо форму
+                } else {
+                    alert("Помилка: " + data.message);
+                }
+            })
+            .catch(err => console.error("Помилка POST:", err));
+    };
 
-        {message && (
-            <Row className="justify-content-center">
-              <Col md={6}>
-                <Alert variant="info" onClose={() => setMessage('')} dismissible>
-                  {message}
-                </Alert>
-              </Col>
+    return (
+        <Container className="mt-5">
+            <h1 className="text-center mb-4">Каталог Фільмів</h1>
+
+            {/* Форма додавання нового фільму */}
+            <Row className="justify-content-center mb-5">
+                <Col md={8}>
+                    <Card className="shadow-sm">
+                        <Card.Header className="bg-dark text-white fw-bold">Додати новий фільм</Card.Header>
+                        <Card.Body>
+                            <Form onSubmit={handleAddMovie}>
+                                <Row>
+                                    <Col md={6} className="mb-3">
+                                        <Form.Control type="text" name="title" placeholder="Назва фільму" value={formData.title} onChange={handleInputChange} required />
+                                    </Col>
+                                    <Col md={6} className="mb-3">
+                                        <Form.Control type="text" name="director" placeholder="Режисер" value={formData.director} onChange={handleInputChange} required />
+                                    </Col>
+                                    <Col md={6} className="mb-3">
+                                        <Form.Select name="genre" value={formData.genre} onChange={handleInputChange} required>
+                                            <option value="">Оберіть жанр...</option>
+                                            <option value="Фантастика">Фантастика</option>
+                                            <option value="Бойовик">Бойовик</option>
+                                            <option value="Драма">Драма</option>
+                                            <option value="Комедія">Комедія</option>
+                                            <option value="Жахи">Жахи</option>
+                                        </Form.Select>
+                                    </Col>
+                                    <Col md={4} className="mb-3">
+                                        <Form.Control type="number" step="0.1" max="10" name="rating" placeholder="Рейтинг (напр. 8.5)" value={formData.rating} onChange={handleInputChange} required />
+                                    </Col>
+                                    <Col md={2}>
+                                        <Button variant="success" type="submit" className="w-100">Додати</Button>
+                                    </Col>
+                                </Row>
+                            </Form>
+                        </Card.Body>
+                    </Card>
+                </Col>
             </Row>
-        )}
 
-        {backendData && (
-            <Row className="justify-content-center">
-              <Col md={6}>
-                <Card className="shadow">
-                  <Card.Header as="h5" className="bg-dark text-white">
-                    Дані з Java-бекенду (JSON format)
-                  </Card.Header>
-                  <Card.Body>
-                    <Card.Text>
-                      <strong>@RequestParam (param):</strong> <span className="text-primary">{backendData.requestParam}</span>
-                    </Card.Text>
-                    <Card.Text>
-                      <strong>@PathVariable (з URL):</strong> <span className="text-success">{backendData.pathVariable}</span>
-                    </Card.Text>
-                    <Card.Text>
-                      <strong>Користувач із сесії Tomcat:</strong> <span className="text-danger">{backendData.sessionUser}</span>
-                    </Card.Text>
-                  </Card.Body>
-                </Card>
-              </Col>
+            <Row className="justify-content-center mb-4">
+                <Col md={8} className="d-flex justify-content-center">
+                    <Button variant="outline-dark" onClick={handleFetchData}>
+                        Отримати дані з БД
+                    </Button>
+                </Col>
             </Row>
-        )}
-      </Container>
-  );
+
+            {/* Список фільмів */}
+            <Row>
+                {movies.map(item => (
+                    <Col md={4} sm={6} key={item.id} className="mb-4">
+                        <Card className="shadow-sm h-100 border-0">
+                            <Card.Body>
+                                <Card.Title className="fw-bold">{item.title}</Card.Title>
+                                <Badge bg="secondary" className="mb-3">{item.genre}</Badge>
+                                <Card.Text>
+                                    <strong>Режисер:</strong> <span className="text-muted">{item.director}</span><br/>
+                                </Card.Text>
+                            </Card.Body>
+                            <Card.Footer className="bg-white border-0 text-end">
+                                <span className="text-warning fw-bold fs-5">★ {item.rating.toFixed(1)}</span>
+                            </Card.Footer>
+                        </Card>
+                    </Col>
+                ))}
+            </Row>
+        </Container>
+    );
 }
 
 export default App;
